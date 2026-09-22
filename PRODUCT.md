@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Next.js 16.3.5 (App Router, Server Actions), React 19.2, TypeScript, Tailwind CSS v4 — existing scaffold in this repo. Data: Supabase Postgres (user-chosen). Payments: UPI deep link + QR generated locally per the NPCI URL spec; **no payment gateway, no aggregator, no MDR**. Deploy target assumed Vercel (no writable local disk — this is why file-based storage was ruled out).
+Next.js 16.3.5 (App Router, Server Actions), React 19.2, TypeScript, Tailwind CSS v4 — existing scaffold in this repo. Data: **Postgres, reached directly over `DATABASE_URL` with `pg`** — run locally via `docker compose`, and any hosted Postgres (Neon, Supabase direct connection, Railway) in production without a code change. Payments: UPI deep link + QR generated locally per the NPCI URL spec; **no payment gateway, no aggregator, no MDR**. Deploy target assumed Vercel (no writable local disk — this is why file-based storage was ruled out).
 
 ## Users
 

@@ -5,7 +5,7 @@ import { Callout } from "@/components/ui";
 import { IconAlert, IconCheck, IconClock } from "@/components/icons";
 import { isAdmin, isAdminConfigured } from "@/lib/admin-auth";
 import { CAPS, PRICES } from "@/lib/config";
-import { db, isDbConfigured, type Registration } from "@/lib/supabase";
+import { isDbConfigured, listAll, type Registration } from "@/lib/registrations";
 import { logoutAction, setStatusAction } from "./actions";
 import { LoginForm } from "./login-form";
 
@@ -40,27 +40,29 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   if (!isDbConfigured()) {
     return (
       <Shell>
-        <Callout tone="danger">Supabase isn&rsquo;t configured — nothing to show yet.</Callout>
+        <Callout tone="danger">
+          <strong className="font-semibold">No database.</strong> Run{" "}
+          <code>docker compose up -d</code> and set <code>DATABASE_URL</code> in .env.local.
+        </Callout>
       </Shell>
     );
   }
 
   const q = String((await searchParams).q ?? "").trim();
 
-  const { data, error } = await db()
-    .from("registrations")
-    .select()
-    .order("created_at", { ascending: false });
-
-  if (error) {
+  let all: Registration[];
+  try {
+    all = await listAll();
+  } catch (error) {
     return (
       <Shell>
-        <Callout tone="danger">Couldn&rsquo;t reach the database: {error.message}</Callout>
+        <Callout tone="danger">
+          Couldn&rsquo;t reach the database: {(error as Error).message}
+        </Callout>
       </Shell>
     );
   }
 
-  const all = (data ?? []) as Registration[];
   const live = all.filter((r) => r.status !== "cancelled");
 
   const collected = live

@@ -29,7 +29,11 @@ export function buildUpiUrl(opts: {
   // Alphanumeric only — some apps reject a tr containing punctuation.
   params.set("tr", opts.ref.replace(/[^A-Za-z0-9]/g, ""));
 
-  return `upi://pay?${params.toString()}`;
+  // URLSearchParams serialises a space as "+", which is form encoding, not URI
+  // encoding. UPI apps that read the query per RFC 3986 show a literal "+" in
+  // the payment note — and that note is what lands in the payee's bank
+  // statement. Percent-encode instead, which every app reads as a space.
+  return `upi://pay?${params.toString().replace(/\+/g, "%20")}`;
 }
 
 /**

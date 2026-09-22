@@ -4,11 +4,21 @@ A single-page registration and UPI payment flow for one event. Name, phone, emai
 
 **→ [SETUP.md](SETUP.md) gets it live.**
 
+## Quick start
+
+```bash
+docker compose up -d   # Postgres, schema applied automatically
+npm run dev            # http://localhost:3000
+```
+
 ## Commands
 
 ```bash
-npm run dev        # http://localhost:3000
-npm run verify     # 50 checks on UPI URLs, QR, validation, capacity maths
+npm run db:up        # start Postgres
+npm run db:down      # stop it (data survives)
+npm run db:psql      # SQL prompt
+npm run verify       # 50 unit checks — UPI URLs, QR, validation, capacity maths
+npm run test:db      # 25 integration checks against real Postgres, in a throwaway database
 npm run typecheck
 npm run build
 ```
@@ -16,6 +26,8 @@ npm run build
 ## Layout
 
 ```
+docker-compose.yml      Postgres 17, and an optional DB UI behind --profile tools
+db/schema.sql           applied on first boot; idempotent, safe to re-run
 app/
   page.tsx              the event + the registration card
   actions.ts            register, submit UTR, resume a ticket
@@ -23,17 +35,19 @@ app/
 lib/
   config.ts             event facts, prices, caps, reference generator
   capacity.ts           pure spot-counting maths (no I/O — unit tested)
+  db.ts                 pooled pg client, server-only
+  registrations.ts      every SQL statement in the app
   upi.ts                NPCI-spec UPI URL + QR
   validation.ts         zod schemas for the form and the UTR
-  supabase.ts           service-role client, server-only
 components/
   register-flow.tsx     the three-step client flow
-supabase/schema.sql     run this once in the Supabase SQL editor
-scripts/verify.mts      the check suite
+scripts/                the two check suites
 ```
 
 `PRODUCT.md` records what is true about the event and what must never be fabricated. `DESIGN.md` records the visual decisions and why.
 
-## The one thing to know
+## Two things to know
 
-UPI cannot tell this site that a payment succeeded. Guests self-report a 12-digit UTR, which proves nothing on its own — the organiser matches it against a bank statement and marks it paid in `/admin`. The UI never styles an unverified payment as confirmed. See [SETUP.md](SETUP.md#how-the-money-actually-works).
+**UPI cannot tell this site that a payment succeeded.** Guests self-report a 12-digit UTR, which proves nothing on its own — the organiser matches it against a bank statement and marks it paid in `/admin`. The UI never styles an unverified payment as confirmed.
+
+**Docker Postgres is for development.** A container on your laptop can't back a public page. Point `DATABASE_URL` at a hosted Postgres (Neon, Supabase, Railway) before the event — nothing else changes. See [SETUP.md](SETUP.md#5-deploying).

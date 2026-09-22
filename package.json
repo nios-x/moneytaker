@@ -8,11 +8,15 @@
     "start": "next start",
     "lint": "eslint",
     "verify": "tsx --conditions=react-server scripts/verify.mts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:psql": "docker compose exec db psql -U sbc -d socialbychance",
+    "test:db": "tsx --conditions=react-server scripts/db-test.mts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.0",
     "next": "16.3.5",
+    "pg": "^8.23.0",
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -22,6 +26,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",

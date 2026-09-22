@@ -13,8 +13,10 @@ import {
   IconShirt,
   IconSpark,
 } from "@/components/icons";
+import { connection } from "next/server";
+
 import { EVENT, INSTAGRAM_HANDLE, ORGANISER_EMAIL } from "@/lib/config";
-import { getAvailability } from "@/lib/supabase";
+import { getAvailability } from "@/lib/registrations";
 
 const EXPECT = [
   { Icon: IconPool, label: "Poolside" },
@@ -33,6 +35,10 @@ const FACTS = [
 ];
 
 export default async function Page() {
+  // Spots left change between one visitor and the next, and a prerendered
+  // counter would be a lie about a real cap. Never serve this from the build.
+  await connection();
+
   const availability = await getAvailability();
   const totalLeft = availability.left.male + availability.left.female;
   const showScarcity = !availability.unavailable && !availability.soldOut && totalLeft <= 25;

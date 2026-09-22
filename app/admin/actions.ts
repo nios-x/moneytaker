@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { isAdmin, signIn, signOut } from "@/lib/admin-auth";
-import { db, type RegistrationStatus } from "@/lib/supabase";
+import { setStatus, type RegistrationStatus } from "@/lib/registrations";
 
 export type LoginState = { error?: string };
 
@@ -46,9 +46,7 @@ export async function setStatusAction(formData: FormData): Promise<void> {
   if (!parsed.success) throw new Error("Bad request");
 
   const { id, status } = parsed.data as { id: string; status: RegistrationStatus };
-
-  const { error } = await db().from("registrations").update({ status }).eq("id", id);
-  if (error) throw new Error("Could not update that registration");
+  await setStatus(id, status);
 
   revalidatePath("/admin");
 }

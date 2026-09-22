@@ -1,19 +1,16 @@
 "use server";
 
-import {
-  isPaymentConfigured,
-  makeRef,
-  PRICES,
-  type Gender,
-} from "@/lib/config";
+import { isPaymentConfigured, PRICES, type Gender } from "@/lib/config";
 import { buildQrSvg, buildUpiUrl } from "@/lib/upi";
 import {
-  db,
+  createRegistration,
+  findById,
   getAvailability,
   isDbConfigured,
+  setUtr,
   type Availability,
   type Registration,
-} from "@/lib/supabase";
+} from "@/lib/registrations";
 import {
   firstErrors,
   registrationSchema,
@@ -71,12 +68,9 @@ export async function registerAction(
     return {
       ok: false,
       formError:
-        "Registrations aren't switched on yet. Set up Supabase in .env.local — see .env.example.",
+        "Registrations aren't switched on yet. Start Postgres with `docker compose up -d` and set DATABASE_URL in .env.local.",
     };
   }
-
-  // Price is derived here, never accepted from the client.
-  const amount = PRICES[gender];
 
   const availability = await getAvailability();
   if (!availability.unavailable && availability.left[gender] <= 0) {
@@ -90,21 +84,25 @@ export async function registerAction(
     };
   }
 
-  const ref = makeRef();
-  const { data, error } = await db()
-    .from("registrations")
-    .insert({ ref, name, phone, email, gender, amount })
-    .select()
-    .single();
+  // Price is derived here, never accepted from the client.
+  const result = await createRegistration({
+    name,
+    phone,
+    email,
+    gender,
+    amount: PRICES[gender],
+  });
 
-  if (error) {
-    // 23505 = unique violation. Either the phone is already registered, or the
-    // ref collided (1 in ~1M). Only the first is worth explaining.
-    if (error.code === "23505") {
-      const existing = await resumeByPhone(phone, name);
-      if (existing) {
-        return { ok: true, ticket: await toTicket(existing), availability };
-      }
+  switch (result.kind) {
+    case "created":
+    case "resumed":
+      return {
+        ok: true,
+        ticket: await toTicket(result.registration),
+        availability: await getAvailability(),
+      };
+
+    case "phone-taken":
       return {
         ok: false,
         availability,
@@ -113,20 +111,14 @@ export async function registerAction(
             "This number is already registered. Enter the same name you used, or email us.",
         },
       };
-    }
 
-    return {
-      ok: false,
-      availability,
-      formError: "We couldn't save that. Check your connection and try once more.",
-    };
+    default:
+      return {
+        ok: false,
+        availability,
+        formError: "We couldn't save that. Check your connection and try once more.",
+      };
   }
-
-  return {
-    ok: true,
-    ticket: await toTicket(data as Registration),
-    availability: await getAvailability(),
-  };
 }
 
 export async function submitUtrAction(
@@ -148,15 +140,7 @@ export async function submitUtrAction(
   }
 
   const { id, utr } = parsed.data;
-
-  const { error } = await db()
-    .from("registrations")
-    .update({ utr, utr_at: new Date().toISOString(), status: "submitted" })
-    .eq("id", id)
-    // Never let a later submission quietly overwrite an organiser's "paid".
-    .in("status", ["pending", "submitted"]);
-
-  if (error) {
+  if (!(await setUtr(id, utr))) {
     return { ok: false, formError: "We couldn't record that. Try once more." };
   }
 
@@ -168,45 +152,8 @@ export async function submitUtrAction(
  * back, or reopened the link hours later; either way they land where they were.
  */
 export async function getTicketAction(id: string): Promise<Ticket | null> {
-  if (!isDbConfigured() || !/^[0-9a-f-]{36}$/i.test(id)) return null;
-
-  const { data, error } = await db()
-    .from("registrations")
-    .select()
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return toTicket(data as Registration);
-}
-
-export async function getStatusAction(
-  id: string,
-): Promise<{ status: Registration["status"]; utr: string | null } | null> {
-  if (!isDbConfigured() || !/^[0-9a-f-]{36}$/i.test(id)) return null;
-
-  const { data, error } = await db()
-    .from("registrations")
-    .select("status, utr")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return data as { status: Registration["status"]; utr: string | null };
-}
-
-/** Same phone and same name means the same person coming back. */
-async function resumeByPhone(phone: string, name: string): Promise<Registration | null> {
-  const { data } = await db()
-    .from("registrations")
-    .select()
-    .eq("phone", phone)
-    .neq("status", "cancelled")
-    .maybeSingle();
-
-  if (!data) return null;
-  const row = data as Registration;
-  return row.name.trim().toLowerCase() === name.trim().toLowerCase() ? row : null;
+  const row = await findById(id);
+  return row ? toTicket(row) : null;
 }
 
 async function toTicket(row: Registration): Promise<Ticket> {

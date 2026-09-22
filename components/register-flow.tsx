@@ -16,7 +16,7 @@ import {
   type Ticket,
   type UtrState,
 } from "@/app/actions";
-import type { Availability } from "@/lib/supabase";
+import type { Availability } from "@/lib/registrations";
 import {
   IconArrow,
   IconBack,
@@ -300,6 +300,54 @@ function PayStep({
   onRestart: () => void;
 }) {
   const amount = `₹${ticket.amount.toLocaleString("en-IN")}`;
+  const [launchFailed, setLaunchFailed] = useState(false);
+  const launchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (launchTimer.current) clearTimeout(launchTimer.current);
+    },
+    [],
+  );
+
+  /**
+   * Browsers give no event when a custom scheme has no handler — Chrome just
+   * logs "the scheme does not have a registered handler" and the click does
+   * nothing. So: attempt the launch, then check whether we are still here. If
+   * a UPI app opened, the tab is hidden by the time the timer fires.
+   */
+  function launch() {
+    setLaunchFailed(false);
+    if (launchTimer.current) clearTimeout(launchTimer.current);
+
+    // Any sign that something took over — the app opening, or the browser's
+    // "Open with?" dialog stealing focus — means the launch was not a dead end.
+    // Cancelling on these keeps us from accusing a working device of having no
+    // UPI app.
+    const onHide = () => {
+      if (launchTimer.current) clearTimeout(launchTimer.current);
+      launchTimer.current = null;
+      cleanup();
+    };
+    const cleanup = () => {
+      window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("blur", onHide);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+
+    window.addEventListener("pagehide", onHide);
+    window.addEventListener("blur", onHide);
+    document.addEventListener("visibilitychange", onHide);
+
+    launchTimer.current = setTimeout(() => {
+      cleanup();
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        setLaunchFailed(true);
+      }
+    }, 1500);
+
+    window.location.href = ticket.upiUrl;
+  }
 
   return (
     <div className="step-in flex flex-col gap-5">
@@ -332,16 +380,29 @@ function PayStep({
             </p>
           </div>
 
-          <Button
-            // Phones hand upi:// straight to the UPI app. Desktops ignore it,
-            // which is why the QR sits above and not below.
-            onClick={() => {
-              window.location.href = ticket.upiUrl;
-            }}
-            className="w-full"
-          >
-            Open my UPI app · {amount}
-          </Button>
+          <div className="flex flex-col gap-2.5">
+            <Button onClick={launch} className="w-full">
+              Open my UPI app · {amount}
+            </Button>
+
+            {launchFailed ? (
+              <Callout tone="warn">
+                <strong className="font-semibold">No UPI app on this device.</strong> Scan the
+                code above with your phone instead, or pay{" "}
+                <span className="tnum text-content font-medium">{amount}</span> to{" "}
+                <span className="tnum text-content font-medium">{ticket.vpa}</span> from any
+                UPI app and put <span className="tnum text-content font-medium">{ticket.ref}</span>{" "}
+                in the note.
+              </Callout>
+            ) : (
+              // Desktops have no upi:// handler. Say so up front rather than
+              // letting the button look broken when it is tapped.
+              <p className="text-content-3 hidden text-center text-[12px] pointer-fine:block">
+                On a computer? The button needs a UPI app — scan the code above with your
+                phone.
+              </p>
+            )}
+          </div>
         </>
       )}
 

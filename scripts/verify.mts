@@ -31,6 +31,21 @@ check("cu = INR", () => assert.equal(p.get("cu"), "INR"));
 check("tn carries the ref into the bank statement", () =>
   assert.equal(p.get("tn"), "SBC-4K9P Social by Chance"));
 check("tr is alphanumeric only", () => assert.match(p.get("tr") ?? "", /^[A-Za-z0-9]+$/));
+check("spaces are percent-encoded, never '+'", () => {
+  // A literal '+' here ends up in the payee's bank statement note.
+  assert.equal(url.includes("+"), false, `found '+' in ${url}`);
+  assert.match(url, /tn=SBC-4K9P%20Social%20by%20Chance/);
+});
+check("the note survives a spec-compliant decode", () => {
+  const raw = url.slice(url.indexOf("?") + 1);
+  const tn = raw.split("&").find((kv) => kv.startsWith("tn="))!.slice(3);
+  assert.equal(decodeURIComponent(tn), "SBC-4K9P Social by Chance");
+});
+check("a payee name with spaces is percent-encoded too", () => {
+  const named = buildUpiUrl({ vpa: "a@b", amount: 1200, ref: "SBC-3", payeeName: "Social by Chance" });
+  assert.equal(named.includes("+"), false);
+  assert.match(named, /pn=Social%20by%20Chance/);
+});
 check("pn included when payee name is set", () => {
   const withName = new URL(
     buildUpiUrl({ vpa: "a@b", amount: 1200, ref: "SBC-1", payeeName: "Social by Chance" }),

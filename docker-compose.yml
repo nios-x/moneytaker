@@ -1,0 +1,55 @@
+# Postgres for Social by Chance.
+#
+#   docker compose up -d          start the database
+#   docker compose logs -f db     watch it
+#   docker compose down           stop it (data survives)
+#   docker compose down -v        stop it and DELETE every registration
+#
+# The schema in db/schema.sql is applied automatically the first time the
+# volume is created. Add --profile tools to also get a database UI on :8080.
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: sbc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sbc
+      # Local development only. The database is bound to 127.0.0.1 below, so it
+      # is not reachable from outside this machine. A hosted database must use
+      # a real secret in DATABASE_URL instead.
+      POSTGRES_PASSWORD: sbc_local_dev
+      POSTGRES_DB: socialbychance
+      # Deterministic collation, so ordering does not depend on the host locale.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    ports:
+      # Bound to loopback on purpose: without the 127.0.0.1 prefix Docker
+      # publishes on every interface and punches through the Windows firewall.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - sbc-pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sbc -d socialbychance"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  # Optional web UI: docker compose --profile tools up -d
+  adminer:
+    image: adminer:5
+    container_name: sbc-adminer
+    restart: unless-stopped
+    profiles: [tools]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DESIGN: dracula
+    ports:
+      - "127.0.0.1:8080:8080"
+
+volumes:
+  sbc-pgdata:

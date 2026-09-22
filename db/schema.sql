@@ -1,7 +1,14 @@
 -- Social by Chance — registrations
--- Run this once in the Supabase SQL editor (Dashboard → SQL Editor → New query).
+--
+-- Docker applies this automatically the first time the database volume is
+-- created (it is mounted into docker-entrypoint-initdb.d). To run it against a
+-- database that already exists:
+--
+--   docker compose exec -T db psql -U sbc -d socialbychance < db/schema.sql
+--
+-- Every statement is idempotent, so re-running it is safe.
 
-create table if not exists public.registrations (
+create table if not exists registrations (
   id          uuid primary key default gen_random_uuid(),
   created_at  timestamptz not null default now(),
   ref         text        not null unique,          -- SBC-4K9P, shown to the guest and put in the UPI note
@@ -9,7 +16,7 @@ create table if not exists public.registrations (
   phone       text        not null,                 -- 10 digits, no country code
   email       text        not null,
   gender      text        not null check (gender in ('male', 'female')),
-  amount      integer     not null,                 -- rupees, derived on the server from gender
+  amount      integer     not null check (amount > 0), -- rupees, derived on the server from gender
   utr         text,                                 -- 12-digit UPI reference, self-reported by the guest
   utr_at      timestamptz,
   status      text        not null default 'pending'
@@ -21,15 +28,16 @@ create table if not exists public.registrations (
   note        text                                  -- organiser's own note, admin only
 );
 
-create index if not exists registrations_created_at_idx on public.registrations (created_at desc);
-create index if not exists registrations_status_idx     on public.registrations (status);
+create index if not exists registrations_created_at_idx on registrations (created_at desc);
+create index if not exists registrations_status_idx     on registrations (status);
 
--- One person, one spot. Stops the double-tap duplicate and the "register twice to hold two spots" trick.
+-- One person, one spot. Stops the double-tap duplicate and the "register twice
+-- to hold two spots" trick, while still letting a cancelled row be re-registered.
 create unique index if not exists registrations_phone_live_idx
-  on public.registrations (phone)
+  on registrations (phone)
   where status <> 'cancelled';
 
--- Lock the table down. Every read and write in this app goes through a Server Action
--- using the service-role key, which bypasses RLS. Enabling RLS with no policies means
--- the anon/public key can do nothing at all, even if it leaks.
-alter table public.registrations enable row level security;
+-- Note on access control: this database is reached only by this app's server
+-- code over DATABASE_URL. There is no PostgREST, no public API and no anon key,
+-- so there is no untrusted client to constrain with row-level security. Keep it
+-- that way: never expose this database to the browser.

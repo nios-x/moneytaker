@@ -49,6 +49,7 @@ Not a ticketing platform. A single event's own front door: 0% fees, money lands 
   - *"What if one night could turn complete strangers into your next favourite people?"*
   - *"Come as strangers. Leave with stories."*
 - Existing collateral leans purple (💜).
+- **Standing design preference (set in an attended direction round, 22 Sep 2026):** the organiser chose the category standard over four alternate visual worlds. This surface and its successors sit alongside **Luma and CRED**; their craft level is the bar. Conventions are executed at full fidelity, without irony.
 
 ## Evidence on Hand
 

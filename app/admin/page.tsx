@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { Callout } from "@/components/ui";
 import { IconAlert, IconCheck, IconClock } from "@/components/icons";
 import { isAdmin, isAdminConfigured } from "@/lib/admin-auth";
-import { CAPS, PRICES } from "@/lib/config";
+import { caps, prices } from "@/lib/config";
 import { isDbConfigured, listAll, type Registration } from "@/lib/registrations";
 import { logoutAction, setStatusAction } from "./actions";
 import { LoginForm } from "./login-form";
@@ -63,6 +63,8 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
     );
   }
 
+  const CAP = caps();
+  const PRICE = prices();
   const live = all.filter((r) => r.status !== "cancelled");
 
   const collected = live
@@ -94,8 +96,8 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           <div>
             <h1 className="display text-[28px]">Guest list</h1>
             <p className="text-content-3 text-[13px]">
-              {live.length} registered · {counts.male}M / {counts.female}F · caps {CAPS.male}M /{" "}
-              {CAPS.female}F
+              {live.length} registered · {counts.male}M / {counts.female}F · caps {CAP.male}M /{" "}
+              {CAP.female}F
             </p>
           </div>
           <form action={logoutAction}>
@@ -222,7 +224,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         )}
 
         <p className="text-content-3 text-[12px]">
-          Entry is {inr(PRICES.male)} male / {inr(PRICES.female)} female. Cancelled rows free
+          Entry is {inr(PRICE.male)} male / {inr(PRICE.female)} female. Cancelled rows free
           their spot again.
         </p>
       </div>

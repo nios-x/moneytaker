@@ -15,7 +15,7 @@ import {
 } from "@/components/icons";
 import { connection } from "next/server";
 
-import { EVENT, INSTAGRAM_HANDLE, ORGANISER_EMAIL } from "@/lib/config";
+import { EVENT, INSTAGRAM_HANDLE, ORGANISER_EMAIL, prices } from "@/lib/config";
 import { getAvailability } from "@/lib/registrations";
 
 const EXPECT = [
@@ -131,7 +131,11 @@ export default async function Page() {
 
           {/* ── The action ──────────────────────────────────────────────── */}
           <div className="lg:sticky lg:top-8">
-            <RegisterFlow availability={availability} organiserEmail={ORGANISER_EMAIL} />
+            <RegisterFlow
+              availability={availability}
+              organiserEmail={ORGANISER_EMAIL}
+              prices={prices()}
+            />
 
             <p className="text-content-3 mt-4 px-1 text-[12px] leading-relaxed">
               Payment is direct UPI to the organiser&rsquo;s account — no gateway, no booking

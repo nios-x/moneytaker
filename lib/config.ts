@@ -17,12 +17,30 @@ export const EVENT = {
 
 export type Gender = "male" | "female";
 
-export const PRICES: Record<Gender, number> = { male: 1700, female: 1200 };
+/**
+ * The real prices. Override in .env.local to test a live UPI payment cheaply
+ * (PRICE_MALE=1 PRICE_FEMALE=1) — that keeps the test amount out of committed
+ * code, so there is no way to ship ₹1 by forgetting to change it back.
+ *
+ * Read at request time, never captured into a module-level constant. A constant
+ * is frozen at whatever the environment held when the module first loaded, so
+ * the page and a Server Action could be built from two different snapshots —
+ * which is exactly how a form ends up promising one price and the server
+ * charging another.
+ */
+export function prices(): Record<Gender, number> {
+  return {
+    male: intFromEnv("PRICE_MALE", 1700),
+    female: intFromEnv("PRICE_FEMALE", 1200),
+  };
+}
 
-export const CAPS: Record<Gender, number> = {
-  male: intFromEnv("CAP_MALE", 40),
-  female: intFromEnv("CAP_FEMALE", 40),
-};
+export function caps(): Record<Gender, number> {
+  return {
+    male: intFromEnv("CAP_MALE", 40),
+    female: intFromEnv("CAP_FEMALE", 40),
+  };
+}
 
 /**
  * How long an unpaid registration holds a spot. Without this, anyone who opens
@@ -31,6 +49,15 @@ export const CAPS: Record<Gender, number> = {
 export const PENDING_HOLD_MS = 20 * 60 * 1000;
 
 export const ORGANISER_EMAIL = process.env.ORGANISER_EMAIL?.trim() || "";
+
+/**
+ * The name the payer's UPI app will show — usually the account holder, not the
+ * event. Purely informational: it warns the guest before they see an unfamiliar
+ * personal name at the moment they are deciding to trust you. It is NEVER put
+ * into the UPI URL; that is UPI_PAYEE_NAME's job, and a wrong value there
+ * triggers a "payee name doesn't match" warning.
+ */
+export const UPI_PAYEE_DISPLAY = process.env.UPI_PAYEE_DISPLAY?.trim() || "";
 export const INSTAGRAM_HANDLE =
   process.env.INSTAGRAM_HANDLE?.trim().replace(/^@/, "") || "";
 

@@ -9,30 +9,43 @@ Local development runs against Postgres in Docker. Going live needs a database t
 Start Docker Desktop, then:
 
 ```bash
-docker compose up -d
+npm run db:up
 ```
 
-That's it. The schema in [`db/schema.sql`](db/schema.sql) is applied automatically the first time the volume is created.
+That starts the container, waits for it to be healthy, and applies migrations.
 
 | | |
 |---|---|
-| `npm run db:up` | start it |
+| `npm run db:up` | start it **and migrate** |
 | `npm run db:down` | stop it — **data survives** |
+| `npm run db:migrate` | apply pending migrations |
+| `npm run db:status` | what's applied, what's pending |
 | `npm run db:psql` | open a SQL prompt |
 | `docker compose down -v` | stop it and **delete every registration** |
 | `docker compose --profile tools up -d` | also start a database UI on [localhost:8080](http://localhost:8080) |
 
 Postgres is bound to `127.0.0.1` on purpose. Without that, Docker publishes on every network interface and punches straight through the Windows firewall.
 
-### Changing the schema later
+### Migrations
 
-The init script only runs on a *fresh* volume. To apply changes to a database that already has data:
+Every `.sql` file in [`db/migrations/`](db/migrations) runs **once**, in filename order, inside a transaction. Applied migrations are recorded in a `schema_migrations` table with a checksum.
+
+`npm run db:migrate` targets whatever `DATABASE_URL` points at — Docker locally, your hosted database in production. Same command either way.
+
+**To change the schema, add a new file. Never edit one that has already run:**
 
 ```bash
-docker compose exec -T db psql -U sbc -d socialbychance < db/schema.sql
+# db/migrations/002_add_dietary_notes.sql
+alter table registrations add column if not exists dietary text;
 ```
 
-Every statement is idempotent, so that is safe to re-run.
+```bash
+npm run db:migrate
+```
+
+If you edit an applied migration, `db:status` shows it as `CHANGED` and the runner warns you — because the database it already ran against will never see the edit.
+
+Migrations run under an advisory lock, so two deploys landing at once queue instead of racing.
 
 ---
 
@@ -91,12 +104,16 @@ Free tiers that work directly:
 
 Then:
 
-1. Apply the schema to the hosted database (`psql "<url>" -f db/schema.sql`, or paste it into the provider's SQL editor).
+1. Point `DATABASE_URL` at the hosted database and run `npm run db:migrate`. Same command as local — that is the whole point of migrations.
 2. Push to GitHub, import at [vercel.com/new](https://vercel.com/new).
 3. Add **every variable from `.env.local`** under Settings → Environment Variables, with `DATABASE_URL` pointing at the hosted database.
 4. Deploy, and put the URL in your Instagram bio.
 
-Managed providers hand you a URL ending in `?sslmode=require`. Keep that parameter. If your host runs many serverless instances, point `DATABASE_URL` at the provider's **pooled** connection string and leave `DATABASE_POOL_MAX` small.
+**Change `sslmode=require` to `sslmode=verify-full`** in the connection string your provider gives you. `pg` treats them identically today, but in `pg` v9 plain `require` drops to libpq semantics and stops verifying the server's certificate. Being explicit keeps the strong behaviour when that lands.
+
+If your host runs many serverless instances, point `DATABASE_URL` at the provider's **pooled** connection string and leave `DATABASE_POOL_MAX` small.
+
+`npm run test:db` never touches a remote database — it ignores `DATABASE_URL` and only runs against local Docker, because it creates and drops databases.
 
 ---
 

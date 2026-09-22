@@ -1,12 +1,12 @@
 # Postgres for Social by Chance.
 #
-#   docker compose up -d          start the database
+#   npm run db:up                 start it AND apply migrations
 #   docker compose logs -f db     watch it
 #   docker compose down           stop it (data survives)
 #   docker compose down -v        stop it and DELETE every registration
 #
-# The schema in db/schema.sql is applied automatically the first time the
-# volume is created. Add --profile tools to also get a database UI on :8080.
+# Starting the container does not create any tables — run `npm run db:migrate`
+# (or just `npm run db:up`). Add --profile tools for a database UI on :8080.
 
 services:
   db:
@@ -27,8 +27,10 @@ services:
       # publishes on every interface and punches through the Windows firewall.
       - "127.0.0.1:5432:5432"
     volumes:
+      # No init script on purpose. The schema is owned by `npm run db:migrate`,
+      # which is the same path a hosted database takes — two mechanisms that can
+      # disagree about the schema is how a database drifts.
       - sbc-pgdata:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sbc -d socialbychance"]
       interval: 3s

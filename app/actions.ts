@@ -1,6 +1,6 @@
 "use server";
 
-import { isPaymentConfigured, PRICES, type Gender } from "@/lib/config";
+import { isPaymentConfigured, prices, UPI_PAYEE_DISPLAY, type Gender } from "@/lib/config";
 import { buildQrSvg, buildUpiUrl } from "@/lib/upi";
 import {
   createRegistration,
@@ -30,6 +30,8 @@ export type Ticket = {
   upiUrl: string;
   qrSvg: string;
   vpa: string;
+  /** The name the payer's UPI app will show, when the organiser has set it. */
+  payeeDisplay: string;
   /**
    * The server is the authority on where a guest is in the flow. Without this,
    * an organiser marking someone paid changes nothing on the guest's screen,
@@ -45,6 +47,8 @@ export type RegisterState = {
   ok: boolean;
   ticket?: Ticket;
   availability?: Availability;
+  /** Sent back when the server disagrees with the price the form displayed. */
+  prices?: Record<Gender, number>;
   errors?: FieldErrors<RegistrationInput>;
   formError?: string;
 };
@@ -95,12 +99,29 @@ export async function registerAction(
   }
 
   // Price is derived here, never accepted from the client.
+  const PRICE = prices();
+  const charged = PRICE[gender];
+
+  // The form reports the price it displayed. If that no longer matches what we
+  // would charge — the config changed between render and submit — refuse and
+  // show the new price rather than silently taking more than the guest agreed
+  // to. The client's number is only ever compared, never used as the amount.
+  const shown = Number(formData.get("shownPrice"));
+  if (Number.isFinite(shown) && shown > 0 && shown !== charged) {
+    return {
+      ok: false,
+      availability,
+      prices: PRICE,
+      formError: `The entry price changed while you were filling this in — it's now ₹${charged.toLocaleString("en-IN")}. Check the amount and submit again.`,
+    };
+  }
+
   const result = await createRegistration({
     name,
     phone,
     email,
     gender,
-    amount: PRICES[gender],
+    amount: charged,
   });
 
   switch (result.kind) {
@@ -195,6 +216,7 @@ async function toTicket(row: Registration): Promise<Ticket> {
     upiUrl,
     qrSvg: configured ? await buildQrSvg(upiUrl) : "",
     vpa,
+    payeeDisplay: UPI_PAYEE_DISPLAY,
     status: row.status,
     utr: row.utr,
     unconfigured: !configured,

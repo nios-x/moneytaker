@@ -7,7 +7,7 @@ import {
   type SpotRow,
   type SpotStatus,
 } from "./capacity";
-import { CAPS, makeRef, type Gender } from "./config";
+import { caps, makeRef, type Gender } from "./config";
 import { isDbConfigured, PG, pgConstraint, pgErrorCode, query, queryOne } from "./db";
 
 export type { Availability } from "./capacity";
@@ -53,6 +53,7 @@ export { isDbConfigured };
  * also keeps this module testable outside Next.
  */
 export async function getAvailability(): Promise<Availability> {
+  const CAPS = caps();
   if (!isDbConfigured()) return emptyAvailability(CAPS);
 
   try {

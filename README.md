@@ -7,18 +7,20 @@ A single-page registration and UPI payment flow for one event. Name, phone, emai
 ## Quick start
 
 ```bash
-docker compose up -d   # Postgres, schema applied automatically
+npm run db:up          # Postgres in Docker + migrations
 npm run dev            # http://localhost:3000
 ```
 
 ## Commands
 
 ```bash
-npm run db:up        # start Postgres
+npm run db:up        # start Postgres and apply migrations
 npm run db:down      # stop it (data survives)
+npm run db:migrate   # apply pending migrations (local or hosted)
+npm run db:status    # what is applied, what is pending
 npm run db:psql      # SQL prompt
-npm run verify       # 50 unit checks — UPI URLs, QR, validation, capacity maths
-npm run test:db      # 25 integration checks against real Postgres, in a throwaway database
+npm run verify       # 53 unit checks — UPI URLs, QR, validation, capacity maths
+npm run test:db      # 28 integration checks against real Postgres, in a throwaway database
 npm run typecheck
 npm run build
 ```
@@ -27,7 +29,8 @@ npm run build
 
 ```
 docker-compose.yml      Postgres 17, and an optional DB UI behind --profile tools
-db/schema.sql           applied on first boot; idempotent, safe to re-run
+db/migrations/          versioned .sql, each applied once and checksummed
+scripts/migrate.mts     the migration runner
 app/
   page.tsx              the event + the registration card
   actions.ts            register, submit UTR, resume a ticket

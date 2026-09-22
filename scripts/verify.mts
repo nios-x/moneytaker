@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 
 import { buildQrSvg, buildUpiUrl, formatInr } from "../lib/upi.ts";
-import { registrationSchema, utrSchema } from "../lib/validation.ts";
+import { normaliseUtr, registrationSchema, utrSchema } from "../lib/validation.ts";
 import { computeAvailability, holdsASpot } from "../lib/capacity.ts";
-import { makeRef, PRICES } from "../lib/config.ts";
+import { makeRef, prices } from "../lib/config.ts";
 
 let pass = 0;
 const fail: string[] = [];
@@ -52,9 +52,38 @@ check("pn included when payee name is set", () => {
   );
   assert.equal(withName.searchParams.get("pn"), "Social by Chance");
 });
-check("female price renders 1200.00", () => {
-  const f = new URL(buildUpiUrl({ vpa: "a@b", amount: PRICES.female, ref: "SBC-2" }));
-  assert.equal(f.searchParams.get("am"), "1200.00");
+// Asserts the encoding contract, not the business value — prices are
+// configurable so a test amount can be set in .env.local without editing code.
+check("any configured price renders with exactly 2 decimals", () => {
+  const P = prices();
+  for (const amount of [P.male, P.female, 1, 50, 1200, 1700, 99999]) {
+    const u = new URL(buildUpiUrl({ vpa: "a@b", amount, ref: "SBC-2" }));
+    assert.match(u.searchParams.get("am") ?? "", /^\d+\.\d{2}$/, `am for ${amount}`);
+    assert.equal(Number(u.searchParams.get("am")), amount);
+  }
+});
+check("prices are positive integers", () => {
+  for (const [g, v] of Object.entries(prices())) {
+    assert.ok(Number.isInteger(v) && v > 0, `${g} price is ${v}`);
+  }
+});
+check("prices are read at call time, not frozen at import", () => {
+  const before = process.env.PRICE_MALE;
+  process.env.PRICE_MALE = "7";
+  const hot = prices().male;
+  if (before === undefined) delete process.env.PRICE_MALE;
+  else process.env.PRICE_MALE = before;
+  assert.equal(hot, 7, "prices() ignored a live env change");
+  assert.equal(prices().male, before ? Number(before) : 1700, "env was not restored");
+});
+check("a bad price value falls back instead of charging zero", () => {
+  const before = process.env.PRICE_MALE;
+  for (const bad of ["0", "-5", "abc", ""]) {
+    process.env.PRICE_MALE = bad;
+    assert.equal(prices().male, 1700, `PRICE_MALE=${JSON.stringify(bad)}`);
+  }
+  if (before === undefined) delete process.env.PRICE_MALE;
+  else process.env.PRICE_MALE = before;
 });
 check("formatInr -> Indian grouping", () => assert.equal(formatInr(1700), "₹1,700"));
 
@@ -120,6 +149,40 @@ check("rejects an unknown gender (price would be undefined)", () =>
 
 const id = "6b1b0f2e-7f3a-4f3f-9a1e-5c2b9d4e8a10";
 check("accepts 12 digits", () => assert.equal(utrSchema.safeParse({ id, utr: "123456789012" }).success, true));
+
+// Taken verbatim from a real Bandhan Bank SMS. The bank prefixes the RRN with
+// "D" for debit; an exact /^\d{12}$/ rejected a guest who had actually paid.
+const REAL_SMS =
+  "INR 1.00 debited from A/c XXXXXXXXXX4020 towards UPI/DR/D130082028421/Mayank  D Value 23-SEP-2026 . Clear Bal is INR 3,622.00. Bandhan Bank";
+
+for (const [label, input] of [
+  ["bare 12 digits", "130082028421"],
+  ["bank D-prefix", "D130082028421"],
+  ["grouped in fours", "1300 8202 8421"],
+  ["hyphenated", "1300-8202-8421"],
+  ["UPI- prefix", "UPI-130082028421"],
+  ["the whole bank SMS pasted", REAL_SMS],
+  ["the UPI/DR fragment", "UPI/DR/D130082028421/Mayank  D"],
+  ["leading/trailing space", "  130082028421  "],
+] as const) {
+  check(`UTR: ${label}`, () => assert.equal(normaliseUtr(input), "130082028421"));
+}
+
+check("UTR from the real SMS passes the schema", () =>
+  assert.equal(utrSchema.parse({ id, utr: REAL_SMS }).utr, "130082028421"));
+
+for (const [label, input] of [
+  ["empty", "   "],
+  ["11 digits", "13008202842"],
+  ["13 digits", "1300820284211"],
+  ["no digits at all", "paid already"],
+  ["two different 12-digit runs", "130082028421 and 999999999999"],
+] as const) {
+  check(`UTR rejected: ${label}`, () => assert.equal(normaliseUtr(input), null));
+}
+
+check("same 12-digit run repeated is still accepted", () =>
+  assert.equal(normaliseUtr("130082028421 / 130082028421"), "130082028421"));
 check("strips spaces in a pasted UTR", () =>
   assert.equal(utrSchema.parse({ id, utr: "1234 5678 9012" }).utr, "123456789012"));
 check("rejects 11 digits", () => assert.equal(utrSchema.safeParse({ id, utr: "12345678901" }).success, false));

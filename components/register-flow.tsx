@@ -32,17 +32,20 @@ type Step = "details" | "pay" | "utr" | "done";
 
 const STORAGE_KEY = "sbc.registration.v1";
 
-const PRICE_LABEL: Record<"male" | "female", string> = {
-  male: "₹1,700",
-  female: "₹1,200",
-};
+export type Prices = Record<"male" | "female", number>;
+
+export const inr = (rupees: number) => `₹${rupees.toLocaleString("en-IN")}`;
 
 export function RegisterFlow({
   availability: initialAvailability,
   organiserEmail,
+  // Passed from the server rather than duplicated here. The price the button
+  // promises and the price the QR charges must come from one place.
+  prices,
 }: {
   availability: Availability;
   organiserEmail: string;
+  prices: Prices;
 }) {
   const [step, setStep] = useState<Step>("details");
   const [ticket, setTicket] = useState<Ticket | null>(null);
@@ -113,7 +116,7 @@ export function RegisterFlow({
 
       <div className="p-5 sm:p-6">
         {step === "details" && (
-          <DetailsStep availability={availability} onIssued={onIssued} />
+          <DetailsStep availability={availability} prices={prices} onIssued={onIssued} />
         )}
 
         {step === "pay" && ticket && (
@@ -146,9 +149,11 @@ const REGISTER_INITIAL: RegisterState = { ok: false };
 
 function DetailsStep({
   availability,
+  prices,
   onIssued,
 }: {
   availability: Availability;
+  prices: Prices;
   onIssued: (t: Ticket, a?: Availability) => void;
 }) {
   const [state, formAction, pending] = useActionState(registerAction, REGISTER_INITIAL);
@@ -159,6 +164,7 @@ function DetailsStep({
   }, [state, onIssued]);
 
   const live = state.availability ?? availability;
+  const shown = state.prices ?? prices;
   const showCounts = !live.unavailable;
   const soldOut = showCounts && live.soldOut;
 
@@ -226,6 +232,9 @@ function DetailsStep({
         hint="Your confirmation and the venue both arrive here."
       />
 
+      {/* What the button promises. The server compares and refuses a mismatch. */}
+      <input type="hidden" name="shownPrice" value={gender ? shown[gender] : ""} />
+
       <fieldset className="flex flex-col gap-2">
         <legend className="text-content-2 mb-1.5 text-[13px] font-medium">Entry</legend>
 
@@ -256,7 +265,7 @@ function DetailsStep({
                   className="sr-only"
                 />
                 <span className="text-content-2 text-[12px] capitalize">{g}</span>
-                <span className="tnum display text-[22px] tracking-tight">{PRICE_LABEL[g]}</span>
+                <span className="tnum display text-[22px] tracking-tight">{inr(shown[g])}</span>
                 {showCounts && (
                   <span
                     className={`tnum text-[11px] ${
@@ -282,7 +291,7 @@ function DetailsStep({
         {pending
           ? "Holding your spot…"
           : gender
-            ? `Continue to pay ${PRICE_LABEL[gender]}`
+            ? `Continue to pay ${inr(shown[gender])}`
             : "Continue to pay"}
         {!pending && <IconArrow className="size-[18px]" />}
       </Button>
@@ -305,7 +314,7 @@ function PayStep({
   onProceed: () => void;
   onRestart: () => void;
 }) {
-  const amount = `₹${ticket.amount.toLocaleString("en-IN")}`;
+  const amount = inr(ticket.amount);
   const [launchFailed, setLaunchFailed] = useState(false);
   const launchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -416,7 +425,19 @@ function PayStep({
         <Row label="Reference" value={<CopyValue value={ticket.ref} />} />
         <Row label="Amount" value={amount} />
         {!ticket.unconfigured && <Row label="Paying to" value={<CopyValue value={ticket.vpa} />} />}
+        {ticket.payeeDisplay && <Row label="Account name" value={ticket.payeeDisplay} />}
       </div>
+
+      {ticket.payeeDisplay && (
+        // A stranger about to send money is asking "is this real?". An
+        // unfamiliar personal name in their UPI app is exactly when that doubt
+        // lands, so say it before they see it rather than after.
+        <p className="text-content-3 text-[12px] leading-relaxed">
+          Your UPI app will show{" "}
+          <span className="text-content-2 font-medium">{ticket.payeeDisplay}</span> — that&rsquo;s
+          the account Social by Chance collects into. It&rsquo;s us.
+        </p>
+      )}
 
       <Callout tone="neutral" icon={<IconClock className="mt-px size-4 shrink-0" />}>
         Keep <span className="tnum text-content font-medium">{ticket.ref}</span> in the payment
@@ -483,7 +504,7 @@ function UtrStep({
         autoFocus
         className="tnum tracking-[0.12em]"
         error={state.errors?.utr}
-        hint="12 digits. Find it under the payment in your UPI app's history."
+        hint="12 digits. Paste the whole line from your bank SMS if that's easier — we'll find it."
       />
 
       {state.formError && <Callout tone="danger">{state.formError}</Callout>}
@@ -579,7 +600,7 @@ function DoneStep({ ticket, organiserEmail }: { ticket: Ticket; organiserEmail: 
 
       <div className="rounded-xl border border-line bg-surface-2 px-4 py-1">
         <Row label="Reference" value={ticket.ref} />
-        <Row label="Amount" value={`₹${ticket.amount.toLocaleString("en-IN")}`} />
+        <Row label="Amount" value={inr(ticket.amount)} />
         {ticket.utr && <Row label="Your UPI reference" value={ticket.utr} />}
         <Row
           label="Status"

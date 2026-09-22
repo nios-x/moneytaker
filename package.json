@@ -9,10 +9,12 @@
     "lint": "eslint",
     "verify": "tsx --conditions=react-server scripts/verify.mts",
     "typecheck": "tsc --noEmit",
-    "db:up": "docker compose up -d",
+    "db:up": "docker compose up -d --wait && npm run db:migrate",
     "db:down": "docker compose down",
     "db:psql": "docker compose exec db psql -U sbc -d socialbychance",
-    "test:db": "tsx --conditions=react-server scripts/db-test.mts"
+    "test:db": "tsx --conditions=react-server scripts/db-test.mts",
+    "db:migrate": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/migrate.mts",
+    "db:status": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/migrate.mts status"
   },
   "dependencies": {
     "next": "16.3.5",

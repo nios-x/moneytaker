@@ -8,15 +8,27 @@
  * on every run, so it can never touch real registrations.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
 import pg from "pg";
 
-const SOURCE_URL =
-  process.env.DATABASE_URL?.trim() ??
-  "postgresql://sbc:sbc_local_dev@127.0.0.1:5432/socialbychance";
+import { migrate } from "./migrate.mts";
+
+const LOCAL_URL = "postgresql://sbc:sbc_local_dev@127.0.0.1:5432/socialbychance";
+
+/**
+ * Deliberately does NOT read DATABASE_URL. This suite creates and drops a
+ * database and truncates tables; pointing it at whatever .env.local happens to
+ * hold — which on a deploy machine is production — would be destructive. Opt in
+ * explicitly with TEST_DATABASE_URL.
+ */
+const SOURCE_URL = process.env.TEST_DATABASE_URL?.trim() ?? LOCAL_URL;
 
 const parsed = new URL(SOURCE_URL);
+
+if (!["localhost", "127.0.0.1", "::1"].includes(parsed.hostname) && !process.env.TEST_DATABASE_URL) {
+  console.error(`\n  Refusing to run destructive tests against ${parsed.hostname}.\n`);
+  process.exit(1);
+}
 const TEST_DB = `${parsed.pathname.slice(1) || "postgres"}_test`;
 
 const adminUrl = new URL(SOURCE_URL);
@@ -46,10 +58,9 @@ await admin.query(`drop database if exists ${quoteIdent(TEST_DB)}`);
 await admin.query(`create database ${quoteIdent(TEST_DB)}`);
 await admin.end();
 
-const seed = new pg.Client({ connectionString: testUrl.toString() });
-await seed.connect();
-await seed.query(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
-await seed.end();
+// Build the test schema through the real migration runner, so these tests fail
+// if a migration is broken rather than testing a schema nothing else uses.
+await migrate(testUrl.toString());
 
 // Set before importing anything that builds a pool — lib/db.ts reads this lazily,
 // but the import itself must not race the assignment.
@@ -78,6 +89,25 @@ let phoneSeq = 6000000000;
 const nextPhone = () => String(++phoneSeq);
 
 const base = { name: "Aarav Sharma", email: "aarav@example.com", gender: "male" as const, amount: 1700 };
+
+/* ── Migrations ──────────────────────────────────────────────────────────── */
+
+await check("migrations are recorded", async () => {
+  const rows = await query<{ version: string }>(`select version from schema_migrations`);
+  assert.ok(rows.length > 0, "no migrations recorded");
+});
+await check("re-running migrate applies nothing and changes nothing", async () => {
+  const again = await migrate(testUrl.toString());
+  assert.deepEqual(again.applied, []);
+  assert.deepEqual(again.changed, [], "a migration file drifted from what was applied");
+  assert.ok(again.alreadyApplied.length > 0);
+});
+await check("a migration that already ran is not re-executed", async () => {
+  const before = await query<{ n: string }>(`select count(*)::int as n from schema_migrations`);
+  await migrate(testUrl.toString());
+  const after = await query<{ n: string }>(`select count(*)::int as n from schema_migrations`);
+  assert.deepEqual(after, before);
+});
 
 /* ── Create ──────────────────────────────────────────────────────────────── */
 

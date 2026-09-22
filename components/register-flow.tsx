@@ -18,6 +18,7 @@ import {
 } from "@/app/actions";
 import type { Availability } from "@/lib/registrations";
 import {
+  IconAlert,
   IconArrow,
   IconBack,
   IconCheck,
@@ -67,7 +68,10 @@ export function RegisterFlow({
         if (cancelled) return;
         if (found) {
           setTicket(found);
-          setStep(stored.step === "done" ? "done" : "pay");
+          // The database decides, not localStorage. Trusting the stored step
+          // would show the QR again to someone whose payment is already
+          // recorded — inviting them to pay a second time.
+          setStep(stepForStatus(found.status));
         } else {
           safeClear();
         }
@@ -94,8 +98,10 @@ export function RegisterFlow({
     setStep("pay");
   }
 
-  function onConfirmed() {
-    if (ticket) safeWrite({ id: ticket.id, step: "done" });
+  function onConfirmed(updated?: Ticket) {
+    if (updated) setTicket(updated);
+    const id = updated?.id ?? ticket?.id;
+    if (id) safeWrite({ id, step: "done" });
     setStep("done");
   }
 
@@ -445,13 +451,13 @@ function UtrStep({
 }: {
   ticket: Ticket;
   onBack: () => void;
-  onConfirmed: () => void;
+  onConfirmed: (updated?: Ticket) => void;
 }) {
   const [state, formAction, pending] = useActionState(submitUtrAction, UTR_INITIAL);
 
   useEffect(() => {
-    if (state.ok) onConfirmed();
-  }, [state.ok, onConfirmed]);
+    if (state.ok) onConfirmed(state.ticket);
+  }, [state.ok, state.ticket, onConfirmed]);
 
   return (
     <form action={formAction} noValidate className="step-in flex flex-col gap-5">
@@ -500,44 +506,97 @@ function UtrStep({
 
 /* ── Step 4 · done ───────────────────────────────────────────────────────── */
 
+/**
+ * Four outcomes, and only one of them is success. A self-reported UTR is never
+ * styled as confirmed — green appears solely when a human matched the money
+ * against the bank statement.
+ */
+const OUTCOME = {
+  paid: {
+    tone: "text-ok",
+    Icon: IconCheck,
+    badge: "Confirmed",
+    heading: (first: string) => `You're in, ${first}.`,
+    body: "We matched your payment. Your spot is confirmed — the exact address goes out by email 24 hours before.",
+    statusLabel: "Confirmed",
+    statusTone: "text-ok",
+    notes: [
+      "The exact address goes out 24 hours before, by email.",
+      "Bring a change of clothes if you're getting in the pool.",
+      "Casual and comfy. That's the whole dress code.",
+    ],
+  },
+  submitted: {
+    tone: "text-warn",
+    Icon: IconClock,
+    badge: "Awaiting verification",
+    heading: (first: string) => `Got it, ${first}.`,
+    body: "We check payments against the bank twice a day. Once yours matches, your spot is confirmed and you'll get an email.",
+    statusLabel: "Submitted, not yet verified",
+    statusTone: "text-warn",
+    notes: [
+      "Confirmation email once we've matched your payment.",
+      "The exact address goes out 24 hours before, by email.",
+      "Bring a change of clothes if you're getting in the pool.",
+    ],
+  },
+  pending: {
+    tone: "text-warn",
+    Icon: IconAlert,
+    badge: "No payment recorded",
+    heading: (first: string) => `Almost there, ${first}.`,
+    body: "We don't have a payment reference against your name yet. If you've already paid, send us the 12-digit reference and we'll match it.",
+    statusLabel: "Not paid",
+    statusTone: "text-content-3",
+    notes: ["Your spot isn't held until we can match a payment."],
+  },
+  cancelled: {
+    tone: "text-content-3",
+    Icon: IconAlert,
+    badge: "Cancelled",
+    heading: (first: string) => `This one's cancelled, ${first}.`,
+    body: "Your registration was cancelled and the spot released. If that looks wrong, email us with your reference and we'll sort it out.",
+    statusLabel: "Cancelled",
+    statusTone: "text-content-3",
+    notes: [],
+  },
+} as const;
+
 function DoneStep({ ticket, organiserEmail }: { ticket: Ticket; organiserEmail: string }) {
+  const outcome = OUTCOME[ticket.status];
+  const first = ticket.name.split(" ")[0];
+
   return (
     <div className="step-in flex flex-col gap-5">
       <div className="flex flex-col gap-2">
-        <div className="text-warn flex items-center gap-2 text-[13px] font-medium">
-          <IconClock className="size-4" />
-          Awaiting verification
+        <div className={`${outcome.tone} flex items-center gap-2 text-[13px] font-medium`}>
+          <outcome.Icon className="size-4" />
+          {outcome.badge}
         </div>
-        <h2 className="display text-[26px]">
-          Got it, {ticket.name.split(" ")[0]}.
-        </h2>
-        <p className="text-content-2 text-[15px] leading-relaxed">
-          We check payments against the bank twice a day. Once yours matches, your spot is
-          confirmed and you&rsquo;ll get an email.
-        </p>
+        <h2 className="display text-[26px]">{outcome.heading(first)}</h2>
+        <p className="text-content-2 text-[15px] leading-relaxed">{outcome.body}</p>
       </div>
 
       <div className="rounded-xl border border-line bg-surface-2 px-4 py-1">
         <Row label="Reference" value={ticket.ref} />
         <Row label="Amount" value={`₹${ticket.amount.toLocaleString("en-IN")}`} />
+        {ticket.utr && <Row label="Your UPI reference" value={ticket.utr} />}
         <Row
           label="Status"
-          value={<span className="text-warn">Submitted, not yet verified</span>}
+          value={<span className={outcome.statusTone}>{outcome.statusLabel}</span>}
         />
       </div>
 
-      <ul className="flex flex-col gap-3">
-        {[
-          "Confirmation email once we've matched your payment.",
-          "The exact address goes out 24 hours before, by email.",
-          "Bring a change of clothes if you're getting in the pool.",
-        ].map((line) => (
-          <li key={line} className="text-content-2 flex items-start gap-2.5 text-[14px]">
-            <IconCheck className="text-accent-bright mt-0.5 size-4 shrink-0" />
-            <span>{line}</span>
-          </li>
-        ))}
-      </ul>
+      {outcome.notes.length > 0 && (
+        <ul className="flex flex-col gap-3">
+          {outcome.notes.map((line) => (
+            <li key={line} className="text-content-2 flex items-start gap-2.5 text-[14px]">
+              <IconCheck className="text-accent-bright mt-0.5 size-4 shrink-0" />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {organiserEmail && (
         <p className="text-content-3 text-[13px] leading-relaxed">
@@ -661,6 +720,18 @@ function readStored(): string | null {
 
 function readStoredOnServer(): string | null {
   return null;
+}
+
+/** Where a returning guest belongs, decided by what the database says. */
+function stepForStatus(status: Ticket["status"]): Step {
+  switch (status) {
+    case "paid":
+    case "submitted":
+    case "cancelled":
+      return "done";
+    default:
+      return "pay";
+  }
 }
 
 function parseStored(raw: string | null): Stored | null {

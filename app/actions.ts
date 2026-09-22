@@ -10,6 +10,7 @@ import {
   setUtr,
   type Availability,
   type Registration,
+  type RegistrationStatus,
 } from "@/lib/registrations";
 import {
   firstErrors,
@@ -29,6 +30,13 @@ export type Ticket = {
   upiUrl: string;
   qrSvg: string;
   vpa: string;
+  /**
+   * The server is the authority on where a guest is in the flow. Without this,
+   * an organiser marking someone paid changes nothing on the guest's screen,
+   * and a returning guest can be shown the QR for a payment already made.
+   */
+  status: RegistrationStatus;
+  utr: string | null;
   /** True when UPI_VPA has not been set yet — the UI says so instead of showing a dead QR. */
   unconfigured: boolean;
 };
@@ -43,6 +51,8 @@ export type RegisterState = {
 
 export type UtrState = {
   ok: boolean;
+  /** The refreshed ticket, so the confirmation screen shows the real new status. */
+  ticket?: Ticket;
   errors?: { utr?: string };
   formError?: string;
 };
@@ -141,10 +151,17 @@ export async function submitUtrAction(
 
   const { id, utr } = parsed.data;
   if (!(await setUtr(id, utr))) {
+    // setUtr refuses on 'paid' and 'cancelled'. If the row is in one of those,
+    // the guest is not in error — show them where they actually stand.
+    const current = await findById(id);
+    if (current && current.status !== "pending") {
+      return { ok: true, ticket: await toTicket(current) };
+    }
     return { ok: false, formError: "We couldn't record that. Try once more." };
   }
 
-  return { ok: true };
+  const updated = await findById(id);
+  return { ok: true, ticket: updated ? await toTicket(updated) : undefined };
 }
 
 /**
@@ -178,6 +195,8 @@ async function toTicket(row: Registration): Promise<Ticket> {
     upiUrl,
     qrSvg: configured ? await buildQrSvg(upiUrl) : "",
     vpa,
+    status: row.status,
+    utr: row.utr,
     unconfigured: !configured,
   };
 }

@@ -1,6 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import {
   getTicketAction,
@@ -40,34 +46,46 @@ export function RegisterFlow({
   const [step, setStep] = useState<Step>("details");
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [availability, setAvailability] = useState(initialAvailability);
-  const [restoring, setRestoring] = useState(true);
+  const [resumeSettled, setResumeSettled] = useState(false);
+
+  // Reads localStorage without breaking hydration: the server snapshot is
+  // always null, so the form itself is server-rendered and a first-time
+  // visitor from Instagram sees the real thing instead of a skeleton. Only
+  // someone who already has a registration stored pays the loading cost.
+  const storedRaw = useSyncExternalStore(subscribeNever, readStored, readStoredOnServer);
 
   // The guest leaves for GPay and comes back — often to a cold page. Put them
   // back exactly where they were.
   useEffect(() => {
+    const stored = parseStored(storedRaw);
+    if (!stored) return;
+
     let cancelled = false;
 
-    const raw = safeRead();
-    if (!raw) {
-      setRestoring(false);
-      return;
-    }
-
-    void getTicketAction(raw.id).then((found) => {
-      if (cancelled) return;
-      if (found) {
-        setTicket(found);
-        setStep(raw.step === "done" ? "done" : "pay");
-      } else {
-        safeClear();
-      }
-      setRestoring(false);
-    });
+    void getTicketAction(stored.id)
+      .then((found) => {
+        if (cancelled) return;
+        if (found) {
+          setTicket(found);
+          setStep(stored.step === "done" ? "done" : "pay");
+        } else {
+          safeClear();
+        }
+      })
+      .catch(() => {
+        // Offline or the action failed. Fall through to the form rather than
+        // stranding them on a skeleton.
+      })
+      .finally(() => {
+        if (!cancelled) setResumeSettled(true);
+      });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [storedRaw]);
+
+  const restoring = Boolean(storedRaw) && !resumeSettled && !ticket;
 
   function onIssued(next: Ticket, nextAvailability?: Availability) {
     setTicket(next);
@@ -566,10 +584,27 @@ function FlowSkeleton() {
 
 type Stored = { id: string; step: Step };
 
-function safeRead(): Stored | null {
+/** The stored value never changes underneath us, so there is nothing to subscribe to. */
+function subscribeNever() {
+  return () => {};
+}
+
+/** Raw string, so useSyncExternalStore can compare snapshots by value. */
+function readStored(): string | null {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function readStoredOnServer(): string | null {
+  return null;
+}
+
+function parseStored(raw: string | null): Stored | null {
+  if (!raw) return null;
+  try {
     const parsed = JSON.parse(raw) as Stored;
     return typeof parsed?.id === "string" ? parsed : null;
   } catch {

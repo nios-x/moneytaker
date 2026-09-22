@@ -68,7 +68,8 @@ export default async function Page() {
                 </p>
               )}
 
-              <h1 className="display text-[clamp(2.75rem,9vw,4.5rem)]">
+              {/* Min sized so "with strangers" clears a 360px screen's gutters. */}
+              <h1 className="display text-[clamp(2.4rem,7vw,4.5rem)]">
                 House party
                 <br />
                 with strangers
@@ -116,7 +117,10 @@ export default async function Page() {
               </p>
             </section>
 
-            <p className="display text-content text-[22px] sm:text-[26px]">{EVENT.tagline}</p>
+            {/* A sentence, not a headline — display leading of 0.98 is too tight once it wraps. */}
+            <p className="display text-content text-[22px] leading-[1.12] sm:text-[26px]">
+              {EVENT.tagline}
+            </p>
           </div>
 
           {/* ── The action ──────────────────────────────────────────────── */}

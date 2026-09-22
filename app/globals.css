@@ -14,7 +14,9 @@
   --color-line: #2a2039;
   --color-line-strong: #3a2e4d;
 
-  --color-accent: #8257ff;
+  /* Tuned down from #8257ff: white-on-accent sat at 4.42:1, and this is the
+     label on the button that takes the money. 5.00:1 at the same hue. */
+  --color-accent: #7a4ef2;
   --color-accent-bright: #a98cff;
   --color-accent-deep: #5b34d4;
   --color-accent-ink: #ffffff;

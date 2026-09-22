@@ -1,10 +1,19 @@
 import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { connection } from "next/server";
 
-import { CAPS, PENDING_HOLD_MS, type Gender } from "./config";
+import { CAPS, type Gender } from "./config";
+import {
+  computeAvailability,
+  emptyAvailability,
+  type Availability,
+  type SpotRow,
+  type SpotStatus,
+} from "./capacity";
 
-export type RegistrationStatus = "pending" | "submitted" | "paid" | "cancelled";
+export type { Availability } from "./capacity";
+export type RegistrationStatus = SpotStatus;
 
 export type Registration = {
   id: string;
@@ -52,54 +61,19 @@ export function isDbConfigured(): boolean {
   );
 }
 
-export type Availability = {
-  taken: Record<Gender, number>;
-  left: Record<Gender, number>;
-  caps: Record<Gender, number>;
-  soldOut: boolean;
-  /** Set when we could not reach the database — the UI hides the counter rather than lying. */
-  unavailable?: boolean;
-};
-
-/**
- * A spot is held by anyone who has paid, says they have paid, or registered in
- * the last few minutes and is presumably staring at the QR right now. Everyone
- * else's abandoned attempt is returned to the pool.
- */
-export function holdsASpot(row: Pick<Registration, "status" | "created_at">, now: number): boolean {
-  if (row.status === "paid" || row.status === "submitted") return true;
-  if (row.status === "cancelled") return false;
-  return now - new Date(row.created_at).getTime() < PENDING_HOLD_MS;
-}
-
 export async function getAvailability(): Promise<Availability> {
-  const empty = { male: 0, female: 0 } as Record<Gender, number>;
+  // Spots left change between one visitor and the next, and a prerendered
+  // counter would be a lie about a real cap. Never serve this from the build.
+  await connection();
 
-  if (!isDbConfigured()) {
-    return { taken: empty, left: { ...CAPS }, caps: CAPS, soldOut: false, unavailable: true };
-  }
+  if (!isDbConfigured()) return emptyAvailability(CAPS);
 
   const { data, error } = await db()
     .from("registrations")
     .select("gender, status, created_at")
     .neq("status", "cancelled");
 
-  if (error || !data) {
-    return { taken: empty, left: { ...CAPS }, caps: CAPS, soldOut: false, unavailable: true };
-  }
+  if (error || !data) return emptyAvailability(CAPS);
 
-  const now = Date.now();
-  const taken: Record<Gender, number> = { male: 0, female: 0 };
-  for (const row of data as Pick<Registration, "gender" | "status" | "created_at">[]) {
-    if (holdsASpot(row, now) && (row.gender === "male" || row.gender === "female")) {
-      taken[row.gender] += 1;
-    }
-  }
-
-  const left: Record<Gender, number> = {
-    male: Math.max(0, CAPS.male - taken.male),
-    female: Math.max(0, CAPS.female - taken.female),
-  };
-
-  return { taken, left, caps: CAPS, soldOut: left.male === 0 && left.female === 0 };
+  return computeAvailability(data as SpotRow[], CAPS);
 }

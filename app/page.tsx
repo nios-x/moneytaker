@@ -1,3 +1,6 @@
+import { connection } from "next/server";
+
+import { AuroraHero } from "@/components/ui/aurora-hero";
 import { RegisterFlow } from "@/components/register-flow";
 import {
   IconCalendar,
@@ -13,18 +16,16 @@ import {
   IconShirt,
   IconSpark,
 } from "@/components/icons";
-import { connection } from "next/server";
-
 import { EVENT, INSTAGRAM_HANDLE, ORGANISER_EMAIL, prices } from "@/lib/config";
 import { getAvailability } from "@/lib/registrations";
 
 const EXPECT = [
-  { Icon: IconPool, label: "Poolside" },
-  { Icon: IconDrink, label: "Food & drinks" },
-  { Icon: IconGames, label: "Games" },
-  { Icon: IconMusic, label: "Music & dancing" },
-  { Icon: IconPeople, label: "A curated crowd" },
-  { Icon: IconSpark, label: "Real conversations" },
+  { Icon: IconPool, label: "Poolside", sub: "Bring a change of clothes" },
+  { Icon: IconDrink, label: "Food & drinks", sub: "Sorted, all night" },
+  { Icon: IconGames, label: "Games", sub: "The icebreaker kind" },
+  { Icon: IconMusic, label: "Music & dancing", sub: "Till late" },
+  { Icon: IconPeople, label: "A curated crowd", sub: "Strangers, on purpose" },
+  { Icon: IconSpark, label: "Real conversations", sub: "The point of the night" },
 ];
 
 const FACTS = [
@@ -45,99 +46,89 @@ export default async function Page() {
 
   return (
     <>
-      <header className="border-b border-line/60">
-        <div className="mx-auto flex max-w-[1080px] items-center justify-between px-5 py-4">
-          <span className="display text-[15px] tracking-[-0.02em]">{EVENT.host}</span>
-          {INSTAGRAM_HANDLE && (
-            <a
-              href={`https://instagram.com/${INSTAGRAM_HANDLE}`}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="text-content-3 hover:text-content inline-flex items-center gap-1.5 rounded-md text-[13px] transition-colors"
-            >
-              <IconInstagram className="size-4" />
-              <span className="hidden sm:inline">@{INSTAGRAM_HANDLE}</span>
-            </a>
-          )}
-        </div>
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <header className="relative">
+        <AuroraHero title="House party with strangers" className="h-[420px] sm:h-[520px]" />
+
+        <span className="display pointer-events-none absolute top-5 left-1/2 z-10 -translate-x-1/2 text-[13px] tracking-[0.18em] text-white uppercase mix-blend-difference">
+          {EVENT.host}
+        </span>
       </header>
 
-      <main className="mx-auto w-full max-w-[1080px] flex-1 px-5 pb-20 pt-10 sm:pt-14">
+      <main className="mx-auto w-full max-w-[1080px] flex-1 px-5 pb-20">
+        {/* The card overlaps the hero so the action is reachable without a
+            scroll on a phone — the whole page exists to be acted on. */}
         <div className="grid gap-10 lg:grid-cols-[1fr_400px] lg:items-start lg:gap-14">
-          {/* ── The offer ───────────────────────────────────────────────── */}
-          <div className="flex flex-col gap-10">
+          <div className="order-2 flex flex-col gap-10 pt-4 lg:order-1 lg:pt-12">
             <section className="flex flex-col gap-5">
               {showScarcity && (
-                <p className="tnum text-warn inline-flex w-fit items-center gap-2 rounded-full border border-warn/25 bg-warn/[0.07] px-3 py-1.5 text-[12px] font-medium">
-                  <span className="bg-warn size-1.5 rounded-full" />
+                <p className="tnum inline-flex w-fit items-center gap-2 rounded-full border border-warn/25 bg-warn-surface px-3 py-1.5 text-[12px] font-medium text-warn">
+                  <span className="size-1.5 rounded-full bg-warn" />
                   {totalLeft} {totalLeft === 1 ? "spot" : "spots"} left
                 </p>
               )}
 
-              {/* Min sized so "with strangers" clears a 360px screen's gutters. */}
-              <h1 className="display text-[clamp(2.4rem,7vw,4.5rem)]">
-                House party
-                <br />
-                with strangers
-              </h1>
-
-              <p className="text-content-2 max-w-[54ch] text-[17px] leading-relaxed sm:text-[19px]">
+              <p className="max-w-[54ch] text-[18px] leading-relaxed text-foreground sm:text-[20px]">
                 What if one night could turn complete strangers into your next favourite
                 people? A house party built around good vibes, new people and real
                 connections.
               </p>
             </section>
 
-            <section className="grid grid-cols-2 gap-x-5 gap-y-4 border-y border-line py-6">
+            <section className="grid grid-cols-2 gap-4 rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-raised)] sm:p-6">
               {FACTS.map(({ Icon, label, sub }) => (
                 <div key={label} className="flex items-start gap-3">
-                  <Icon className="text-accent-bright mt-0.5 size-[18px] shrink-0" />
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-accent-foreground">
+                    <Icon className="size-[18px]" />
+                  </span>
                   <div className="flex min-w-0 flex-col">
-                    <span className="text-content text-[15px] font-medium">{label}</span>
-                    <span className="text-content-3 text-[13px] leading-snug">{sub}</span>
+                    <span className="text-[15px] font-medium text-foreground">{label}</span>
+                    <span className="text-[13px] leading-snug text-muted-foreground">{sub}</span>
                   </div>
                 </div>
               ))}
             </section>
 
-            <section className="flex flex-col gap-4">
-              <h2 className="text-content text-[15px] font-semibold">What the night has</h2>
-              <ul className="grid grid-cols-2 gap-x-5 gap-y-3.5">
-                {EXPECT.map(({ Icon, label }) => (
-                  <li key={label} className="text-content-2 flex items-center gap-2.5 text-[15px]">
-                    <Icon className="text-content-3 size-[18px] shrink-0" />
-                    {label}
+            <section className="flex flex-col gap-5">
+              <h2 className="display text-[28px] sm:text-[32px]">What the night has</h2>
+              <ul className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                {EXPECT.map(({ Icon, label, sub }) => (
+                  <li key={label} className="flex items-start gap-3">
+                    <Icon className="mt-0.5 size-[18px] shrink-0 text-primary" />
+                    <div className="flex flex-col">
+                      <span className="text-[15px] font-medium text-foreground">{label}</span>
+                      <span className="text-[13px] text-muted-foreground">{sub}</span>
+                    </div>
                   </li>
                 ))}
               </ul>
             </section>
 
-            <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface/60 p-5">
-              <h2 className="text-content text-[15px] font-semibold">
+            <section className="flex flex-col gap-3 rounded-2xl bg-muted p-5 sm:p-6">
+              <h2 className="text-[15px] font-semibold text-foreground">
                 Why the numbers stay small
               </h2>
-              <p className="text-content-2 text-[15px] leading-relaxed">
+              <p className="text-[15px] leading-relaxed text-muted-foreground">
                 A curated crowd only works at a certain size. Past that, it&rsquo;s just a
                 party. We cap entries so the room stays comfortable and you actually get to
                 meet people — not shout over them.
               </p>
             </section>
 
-            {/* A sentence, not a headline — display leading of 0.98 is too tight once it wraps. */}
-            <p className="display text-content text-[22px] leading-[1.12] sm:text-[26px]">
+            <p className="display text-[26px] leading-[1.12] text-foreground sm:text-[32px]">
               {EVENT.tagline}
             </p>
           </div>
 
           {/* ── The action ──────────────────────────────────────────────── */}
-          <div className="lg:sticky lg:top-8">
+          <div className="relative z-10 order-1 -mt-16 lg:order-2 lg:sticky lg:top-8 lg:-mt-24">
             <RegisterFlow
               availability={availability}
               organiserEmail={ORGANISER_EMAIL}
               prices={prices()}
             />
 
-            <p className="text-content-3 mt-4 px-1 text-[12px] leading-relaxed">
+            <p className="mt-4 px-1 text-[12px] leading-relaxed text-subtle-foreground">
               Payment is direct UPI to the organiser&rsquo;s account — no gateway, no booking
               fee. Your spot is confirmed once we match your payment by hand.
             </p>
@@ -145,8 +136,8 @@ export default async function Page() {
         </div>
       </main>
 
-      <footer className="border-t border-line/60">
-        <div className="text-content-3 mx-auto flex max-w-[1080px] flex-col gap-3 px-5 py-8 text-[13px] sm:flex-row sm:items-center sm:justify-between">
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-[1080px] flex-col gap-3 px-5 py-8 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>
             {EVENT.host} · {EVENT.city}
           </span>
@@ -154,7 +145,7 @@ export default async function Page() {
             {ORGANISER_EMAIL && (
               <a
                 href={`mailto:${ORGANISER_EMAIL}`}
-                className="hover:text-content inline-flex items-center gap-1.5 rounded-md transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-md transition-colors hover:text-foreground"
               >
                 <IconMail className="size-4" />
                 {ORGANISER_EMAIL}
@@ -165,7 +156,7 @@ export default async function Page() {
                 href={`https://instagram.com/${INSTAGRAM_HANDLE}`}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="hover:text-content inline-flex items-center gap-1.5 rounded-md transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-md transition-colors hover:text-foreground"
               >
                 <IconInstagram className="size-4" />@{INSTAGRAM_HANDLE}
               </a>

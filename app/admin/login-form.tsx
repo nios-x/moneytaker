@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 
-import { Button, Callout, Field } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Callout, Field } from "@/components/ui";
 import { loginAction, type LoginState } from "./actions";
 
 const INITIAL: LoginState = {};
@@ -13,11 +14,11 @@ export function LoginForm() {
   return (
     <form
       action={formAction}
-      className="mx-auto flex w-full max-w-[340px] flex-col gap-5 rounded-2xl border border-line bg-surface p-6 shadow-[var(--shadow-card)]"
+      className="mx-auto flex w-full max-w-[340px] flex-col gap-5 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
     >
       <div className="flex flex-col gap-1">
         <h1 className="display text-[22px]">Guest list</h1>
-        <p className="text-content-3 text-[13px]">Organisers only.</p>
+        <p className="text-[13px] text-muted-foreground">Organisers only.</p>
       </div>
 
       <Field
@@ -33,7 +34,7 @@ export function LoginForm() {
 
       {!state.error && <Callout tone="neutral">Set in <code>ADMIN_PASSWORD</code>.</Callout>}
 
-      <Button type="submit" pending={pending} className="w-full">
+      <Button type="submit" disabled={pending} className="h-12 w-full text-[15px] font-semibold">
         {pending ? "Checking…" : "Open the list"}
       </Button>
     </form>

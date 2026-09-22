@@ -176,6 +176,14 @@ export function IconInstagram({ className }: IconProps) {
   );
 }
 
+export function IconX({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="m6 6 12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
 export function IconSpinner({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

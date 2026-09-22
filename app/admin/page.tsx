@@ -6,8 +6,9 @@ import { IconAlert, IconCheck, IconClock } from "@/components/icons";
 import { isAdmin, isAdminConfigured } from "@/lib/admin-auth";
 import { caps, prices } from "@/lib/config";
 import { isDbConfigured, listAll, type Registration } from "@/lib/registrations";
-import { logoutAction, setStatusAction } from "./actions";
+import { logoutAction } from "./actions";
 import { LoginForm } from "./login-form";
+import { StatusButton } from "./status-button";
 
 export const metadata: Metadata = {
   title: "Guest list — Social by Chance",
@@ -95,13 +96,13 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="display text-[28px]">Guest list</h1>
-            <p className="text-content-3 text-[13px]">
+            <p className="text-subtle-foreground text-[13px]">
               {live.length} registered · {counts.male}M / {counts.female}F · caps {CAP.male}M /{" "}
               {CAP.female}F
             </p>
           </div>
           <form action={logoutAction}>
-            <button className="text-content-3 hover:text-content rounded-md text-[13px] transition-colors">
+            <button className="text-subtle-foreground hover:text-foreground rounded-md text-[13px] transition-colors">
               Sign out
             </button>
           </form>
@@ -134,22 +135,22 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
             defaultValue={q}
             placeholder="Search name, phone, email, reference or UTR"
             aria-label="Search registrations"
-            className="w-full rounded-xl border border-line bg-surface-2 px-4 py-3 text-[15px] outline-none transition-colors placeholder:text-content-3 focus:border-accent"
+            className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-[15px] outline-none transition-colors placeholder:text-subtle-foreground focus:border-ring"
           />
-          <button className="rounded-xl border border-line bg-surface-2 px-4 text-[14px] font-medium transition-colors hover:border-line-strong">
+          <button className="rounded-xl border border-border bg-muted px-4 text-[14px] font-medium transition-colors hover:border-border-strong">
             Search
           </button>
         </form>
 
         {rows.length === 0 ? (
-          <p className="text-content-3 rounded-xl border border-dashed border-line px-5 py-10 text-center text-[14px]">
+          <p className="text-subtle-foreground rounded-xl border border-dashed border-border px-5 py-10 text-center text-[14px]">
             {q ? `Nothing matches "${q}".` : "No registrations yet."}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-line">
+          <div className="overflow-x-auto rounded-2xl border border-border">
             <table className="w-full min-w-[760px] border-collapse text-left">
               <thead>
-                <tr className="text-content-3 bg-surface-2 text-[12px]">
+                <tr className="text-subtle-foreground bg-muted text-[12px]">
                   <Th>Guest</Th>
                   <Th>Contact</Th>
                   <Th>Ref</Th>
@@ -163,33 +164,33 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
                 {rows.map((r) => (
                   <tr
                     key={r.id}
-                    className={`border-t border-line align-top text-[14px] ${
+                    className={`border-t border-border align-top text-[14px] ${
                       r.status === "cancelled" ? "opacity-45" : ""
                     }`}
                   >
                     <Td>
-                      <div className="text-content font-medium">{r.name}</div>
-                      <div className="text-content-3 text-[12px] capitalize">
+                      <div className="text-foreground font-medium">{r.name}</div>
+                      <div className="text-subtle-foreground text-[12px] capitalize">
                         {r.gender} · {when(r.created_at)}
                       </div>
                     </Td>
                     <Td>
                       <a
                         href={`tel:+91${r.phone}`}
-                        className="tnum text-content-2 hover:text-content block transition-colors"
+                        className="tnum text-muted-foreground hover:text-foreground block transition-colors"
                       >
                         +91 {r.phone}
                       </a>
                       <a
                         href={`mailto:${r.email}`}
-                        className="text-content-3 hover:text-content block max-w-[190px] truncate text-[12px] transition-colors"
+                        className="text-subtle-foreground hover:text-foreground block max-w-[190px] truncate text-[12px] transition-colors"
                       >
                         {r.email}
                       </a>
                     </Td>
-                    <Td className="tnum text-content-2">{r.ref}</Td>
-                    <Td className="tnum text-content-2">{r.utr ?? "—"}</Td>
-                    <Td className="tnum text-content-2">{r.amount.toLocaleString("en-IN")}</Td>
+                    <Td className="tnum text-muted-foreground">{r.ref}</Td>
+                    <Td className="tnum text-muted-foreground">{r.utr ?? "—"}</Td>
+                    <Td className="tnum text-muted-foreground">{r.amount.toLocaleString("en-IN")}</Td>
                     <Td>
                       <StatusPill status={r.status} />
                     </Td>
@@ -198,21 +199,13 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
                         {(["paid", "pending", "cancelled"] as const)
                           .filter((s) => s !== r.status)
                           .map((s) => (
-                            <form action={setStatusAction} key={s}>
-                              <input type="hidden" name="id" value={r.id} />
-                              <input type="hidden" name="status" value={s} />
-                              <button
-                                className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                                  s === "paid"
-                                    ? "border-ok/30 text-ok hover:bg-ok/10"
-                                    : s === "cancelled"
-                                      ? "border-line text-content-3 hover:border-danger/40 hover:text-danger"
-                                      : "border-line text-content-3 hover:text-content"
-                                }`}
-                              >
-                                {s === "paid" ? "Paid" : s === "pending" ? "Unpaid" : "Cancel"}
-                              </button>
-                            </form>
+                            <StatusButton
+                              key={s}
+                              id={r.id}
+                              next={s}
+                              label={s === "paid" ? "Paid" : s === "pending" ? "Unpaid" : "Cancel"}
+                              confirm={confirmFor(r.status, s)}
+                            />
                           ))}
                       </div>
                     </Td>
@@ -223,7 +216,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           </div>
         )}
 
-        <p className="text-content-3 text-[12px]">
+        <p className="text-subtle-foreground text-[12px]">
           Entry is {inr(PRICE.male)} male / {inr(PRICE.female)} female. Cancelled rows free
           their spot again.
         </p>
@@ -255,12 +248,12 @@ function Stat({
   sub?: string;
   tone?: "ok" | "warn";
 }) {
-  const color = tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : "text-content";
+  const color = tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : "text-foreground";
   return (
-    <div className="rounded-xl border border-line bg-surface p-4">
-      <div className="text-content-3 text-[12px]">{label}</div>
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="text-subtle-foreground text-[12px]">{label}</div>
       <div className={`tnum display mt-1 text-[24px] ${color}`}>{value}</div>
-      {sub && <div className="text-content-3 mt-0.5 text-[11px]">{sub}</div>}
+      {sub && <div className="text-subtle-foreground mt-0.5 text-[11px]">{sub}</div>}
     </div>
   );
 }
@@ -269,8 +262,8 @@ function StatusPill({ status }: { status: Registration["status"] }) {
   const map = {
     paid: { label: "Paid", cls: "border-ok/30 bg-ok/10 text-ok", Icon: IconCheck },
     submitted: { label: "Check UTR", cls: "border-warn/30 bg-warn/10 text-warn", Icon: IconClock },
-    pending: { label: "Unpaid", cls: "border-line bg-surface-2 text-content-3", Icon: IconAlert },
-    cancelled: { label: "Cancelled", cls: "border-line bg-surface-2 text-content-3", Icon: IconAlert },
+    pending: { label: "Unpaid", cls: "border-border bg-muted text-subtle-foreground", Icon: IconAlert },
+    cancelled: { label: "Cancelled", cls: "border-border bg-muted text-subtle-foreground", Icon: IconAlert },
   }[status];
 
   return (
@@ -289,6 +282,22 @@ function Th({ children }: { children: React.ReactNode }) {
 
 function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <td className={`px-4 py-3 ${className}`}>{children}</td>;
+}
+
+/**
+ * Which moves are worth a second look. Undoing a verified payment and
+ * cancelling both change what the guest sees on their own screen, so neither
+ * should be one stray tap away. Everything else — including restoring a
+ * cancelled row — is either routine or already an undo.
+ */
+function confirmFor(
+  from: Registration["status"],
+  to: Registration["status"],
+): string | undefined {
+  if (to === "cancelled") return "Free the spot?";
+  if (to === "pending" && from === "paid") return "Undo paid?";
+  if (to === "pending" && from === "submitted") return "Mark unpaid?";
+  return undefined;
 }
 
 function inr(n: number): string {

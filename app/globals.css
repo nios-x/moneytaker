@@ -1,75 +1,203 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-/* ── Tokens ───────────────────────────────────────────────────────────────
-   See DESIGN.md. Dark is forced by the use scene: a phone at 40% brightness
-   on a Gurugram street at 11pm, arriving from a dark Instagram feed. There is
-   no light mode because there is no light-mode moment for this page.        */
+@custom-variant dark (&:is(.dark *));
 
-@theme {
-  --color-ink: #0a0711;
-  --color-ink-deep: #06040c;
-  --color-surface: #140e1e;
-  --color-surface-2: #1c1429;
-  --color-surface-3: #241a33;
-  --color-line: #2a2039;
-  --color-line-strong: #3a2e4d;
+/* ── Theme ────────────────────────────────────────────────────────────────
+   Light, with one violet carrying every action. See DESIGN.md.
+   shadcn's token names are the single source of truth — semantic extras
+   (warn / ok / display) are layered on top rather than run as a rival system.
+   Every pair below is contrast-checked; the numbers are in DESIGN.md.        */
 
-  /* Tuned down from #8257ff: white-on-accent sat at 4.42:1, and this is the
-     label on the button that takes the money. 5.00:1 at the same hue. */
-  --color-accent: #7a4ef2;
-  --color-accent-bright: #a98cff;
-  --color-accent-deep: #5b34d4;
-  --color-accent-ink: #ffffff;
+:root {
+  --radius: 0.75rem;
 
-  --color-content: #f5f2fa;
-  --color-content-2: #a79fb8;
-  --color-content-3: #8b82a0;
+  --background: #fdfcff;
+  --foreground: #16121f;
 
-  --color-warn: #f5a524;
-  --color-warn-dim: #3a2a10;
-  --color-ok: #3dd68c;
-  --color-danger: #f75e68;
+  --card: #ffffff;
+  --card-foreground: #16121f;
+  --popover: #ffffff;
+  --popover-foreground: #16121f;
 
-  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  /* The violet that takes the money. White on it is 5.00:1. */
+  --primary: #7a4ef2;
+  --primary-foreground: #ffffff;
 
-  /* Layered: a wide ambient pool plus a tighter key. Both carry an offset and
-     a real blur — a zero-offset colored halo is decoration, not depth. */
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 24px 48px -12px rgb(0 0 0 / 0.7);
-  --shadow-raised: 0 1px 1px rgb(0 0 0 / 0.5), 0 8px 24px -8px rgb(0 0 0 / 0.6);
-  --shadow-accent: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px -8px rgb(91 52 212 / 0.55);
+  --secondary: #f5f2fa;
+  --secondary-foreground: #2a2338;
 
-  /* Exponential ease-out. Motion starts fast and settles, so it reads as mass
+  --muted: #f5f2fa;
+  /* 6.95:1 on the page, 6.41:1 on a muted field. Tinted from the violet, never gray. */
+  --muted-foreground: #5c5470;
+
+  --accent: #f1ecfe;
+  --accent-foreground: #4a2bb0;
+
+  --destructive: #c02a37;
+  --destructive-foreground: #ffffff;
+
+  --border: #e7e3ef;
+  --input: #e7e3ef;
+  --ring: #7a4ef2;
+
+  /* Placeholders and meta. 5.28:1 on white, 4.77:1 on a muted field. */
+  --subtle-foreground: #6f6882;
+  --border-strong: #d6d0e4;
+
+  /* Never green until a human has matched the money — see DESIGN.md. */
+  --warn: #9a5b00;
+  --warn-surface: #fdf4e3;
+  --ok: #0f7a45;
+  --ok-surface: #e9f7ef;
+  --danger: #c02a37;
+  --danger-surface: #fdeced;
+
+  --chart-1: #7a4ef2;
+  --chart-2: #a98cff;
+  --chart-3: #5c5470;
+  --chart-4: #9a5b00;
+  --chart-5: #0f7a45;
+
+  --sidebar: #faf8fe;
+  --sidebar-foreground: #16121f;
+  --sidebar-primary: #7a4ef2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1ecfe;
+  --sidebar-accent-foreground: #4a2bb0;
+  --sidebar-border: #e7e3ef;
+  --sidebar-ring: #7a4ef2;
+}
+
+/* Present so shadcn components that ship `dark:` variants stay coherent if a
+   `.dark` ancestor ever appears. The app itself does not offer a dark toggle. */
+.dark {
+  --background: #0a0711;
+  --foreground: #f5f2fa;
+  --card: #140e1e;
+  --card-foreground: #f5f2fa;
+  --popover: #140e1e;
+  --popover-foreground: #f5f2fa;
+  --primary: #8b64ff;
+  --primary-foreground: #0a0711;
+  --secondary: #1c1429;
+  --secondary-foreground: #f5f2fa;
+  --muted: #1c1429;
+  --muted-foreground: #a79fb8;
+  --accent: #241a33;
+  --accent-foreground: #d3c2ff;
+  --destructive: #f75e68;
+  --destructive-foreground: #0a0711;
+  --border: #2a2039;
+  --input: #2a2039;
+  --ring: #a98cff;
+  --subtle-foreground: #8b82a0;
+  --border-strong: #3a2e4d;
+  --warn: #f5a524;
+  --warn-surface: #2c2010;
+  --ok: #3dd68c;
+  --ok-surface: #0f2a1d;
+  --danger: #f75e68;
+  --danger-surface: #2c1417;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-inter), sans-serif;
+  --font-heading: var(--font-bricolage), var(--font-inter), sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-border-strong: var(--border-strong);
+  --color-warn: var(--warn);
+  --color-warn-surface: var(--warn-surface);
+  --color-ok: var(--ok);
+  --color-ok-surface: var(--ok-surface);
+  --color-danger: var(--danger);
+  --color-danger-surface: var(--danger-surface);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Layered: a wide ambient pool plus a tighter key. On light, depth is a
+     whisper — a heavy shadow on white reads as dirt, not elevation. */
+  --shadow-card: 0 1px 2px rgb(22 18 31 / 0.04), 0 12px 32px -8px rgb(22 18 31 / 0.10);
+  --shadow-raised: 0 1px 2px rgb(22 18 31 / 0.05), 0 4px 12px -4px rgb(22 18 31 / 0.08);
+  --shadow-primary: 0 1px 2px rgb(74 43 176 / 0.12), 0 8px 20px -6px rgb(122 78 242 / 0.35);
+
+  /* Exponential ease-out: motion starts fast and settles, reading as mass
      arriving rather than a timer expiring. */
   --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
-    scrollbar-color: var(--color-line-strong) transparent;
+    scrollbar-color: var(--border-strong) transparent;
   }
 
   body {
-    background-color: var(--color-ink);
-    color: var(--color-content);
-    font-family: var(--font-sans);
-    font-feature-settings: "cv05" 1;
+    @apply bg-background text-foreground font-sans;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   /* ── Browser surfaces ──────────────────────────────────────────────────
      The parts we did not draw still belong to the design.                 */
 
   ::selection {
-    background-color: color-mix(in oklab, var(--color-accent) 40%, transparent);
-    color: var(--color-content);
+    background-color: color-mix(in oklab, var(--primary) 22%, transparent);
+    color: var(--foreground);
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-accent-bright);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 6px;
   }
 
   /* Only for mice. Touch keeps the platform's own overlay scrollbar. */
@@ -82,12 +210,12 @@
       background: transparent;
     }
     ::-webkit-scrollbar-thumb {
-      background: var(--color-line-strong);
-      border: 3px solid var(--color-ink);
+      background: var(--border-strong);
+      border: 3px solid var(--background);
       border-radius: 999px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: color-mix(in oklab, var(--color-accent) 55%, var(--color-line-strong));
+      background: color-mix(in oklab, var(--primary) 50%, var(--border-strong));
     }
   }
 
@@ -101,7 +229,7 @@
 
   input::placeholder,
   textarea::placeholder {
-    color: var(--color-content-3);
+    color: var(--subtle-foreground);
   }
 
   input::-webkit-outer-spin-button,
@@ -114,16 +242,10 @@
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus {
-    -webkit-text-fill-color: var(--color-content);
-    caret-color: var(--color-accent-bright);
-    box-shadow: 0 0 0 1000px var(--color-surface-2) inset;
+    -webkit-text-fill-color: var(--foreground);
+    caret-color: var(--primary);
+    box-shadow: 0 0 0 1000px var(--muted) inset;
     transition: background-color 9999s ease-out;
-  }
-
-  /* Any number that can change gets fixed-width digits so it never jitters. */
-  .tnum {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum" 1;
   }
 
   h1,
@@ -131,14 +253,24 @@
   h3 {
     text-wrap: balance;
   }
+
+  p {
+    text-wrap: pretty;
+  }
 }
 
 @layer utilities {
   .display {
     font-family: var(--font-display);
     font-weight: 700;
-    letter-spacing: -0.04em;
-    line-height: 0.98;
+    letter-spacing: -0.035em;
+    line-height: 1;
+  }
+
+  /* Any number that can change gets fixed-width digits so it never jitters. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 
   /* The single authored moment: values settling into the ticket. */
@@ -183,9 +315,9 @@
   .skeleton {
     background: linear-gradient(
         90deg,
-        var(--color-surface-2) 0%,
-        var(--color-surface-3) 50%,
-        var(--color-surface-2) 100%
+        var(--muted) 0%,
+        color-mix(in oklab, var(--muted) 60%, #ffffff) 50%,
+        var(--muted) 100%
       )
       0 0 / 200% 100%;
     animation: sheen 1.4s linear infinite;
